@@ -359,9 +359,15 @@ def hull_triangles(h, n_per_half=48, wall=0.025, ply=0.006, roof_n=0,
         _zs = float(np.max(Vo[i, :, 2]))
         _zb = _zs - _des.GUNW_H
         A, B = [], []
+        out = -xdir          # OUTWARD = away from the hull at this end
         for j in range(n):
             band = Vo[i, j, 2] >= _zb - 1e-9
-            ax = x0 + xdir * (0.0002 - (_des.GUNW_T if band else 0.0))
+            # the plate's outer face sits 0.2 mm real OUTSIDE the end ring
+            # (an independent solid, sub-print-layer proud so it fuses) and
+            # juts out by GUNW_T over the rail band. Inboard-nudging it used
+            # to leave the hull's end-ring edges proud of the plate face -
+            # they rendered as ragged patches THROUGH the plate in viewers.
+            ax = x0 + out * (0.0002 + (_des.GUNW_T if band else 0.0))
             A.append(np.array([ax, Vo[i, j, 1], Vo[i, j, 2]], float))
             # the inboard face comes off x0 INDEPENDENTLY: deriving it from
             # `ax` cancelled the band and the inboard board vanished

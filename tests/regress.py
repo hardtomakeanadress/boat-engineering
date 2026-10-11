@@ -671,6 +671,19 @@ check("rails fused into the hull profile (hull reaches outwale width)",
       abs(_hull_pts[:, 1].max() * 24 - (_fl_beam * 1000 / 2
                                         + designer.GUNW_T * 1000)) < 6.0)
 
+# the SOLID END PLATES must sit OUTSIDE the shell's end rings (0.2 mm
+# real proud + the rail-band cap juts GUNW_T): an inboard nudge left the
+# hull's ring edges proud of the plate face and viewers rendered them as
+# ragged patches THROUGH the plate (the user's screenshots). The model
+# length is the discriminating number: loa + 2 x (GUNW_T + 0.0002).
+_vp = _np.asarray([(t[0], t[1], t[2]) for t in
+                   export_stl.hull_triangles(_hfl, n_per_half=48,
+                                             roof_n=0)], float).reshape(-1, 3)
+_fl_loa = _hfl["stations"][-1]["x"] - _hfl["stations"][0]["x"]
+check("end plates sit OUTSIDE the end rings (band cap + nudge proud)",
+      abs(float(_np.ptp(_vp[:, 0]))
+          - (_fl_loa + 2 * (designer.GUNW_T + 0.0002))) < 0.003)
+
 # --- materials list: quantities computed from the model ------------------
 r_m = run(['python3', f'{B}/materials.py', '/tmp/h_fl.json',
            '--people', '3', '--gear', '670', '--json', '/tmp/bom.json',

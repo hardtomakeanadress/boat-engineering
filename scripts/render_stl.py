@@ -104,13 +104,16 @@ def classify(tris, groups, hull_json=None):
     ctr = tris[shell].reshape(-1, 3).mean(axis=0)
     for i in shell:
         t = tris[i]
+        mid = t.mean(axis=0)
         nrm = np.cross(t[1] - t[0], t[2] - t[0])
         ln = np.linalg.norm(nrm)
         if ln < 1e-12:
-            cols[i] = C_ODD
+            # zero-area slivers (the end ring's flat strip collapses to
+            # zero width where the shell's end faces coincide): invisible
+            # in print and viewers, they cannot be a WRONG PART - no alarm
+            cols[i] = (C_EXT_STERN if mid[0] < ctr[0] else C_EXT_BOW)
             continue
         n = nrm / ln
-        mid = t.mean(axis=0)
         if np.dot(n, mid - ctr) > 0:              # exterior skin
             if n[2] > 0.5:
                 cols[i] = C_RIM
