@@ -1,0 +1,13 @@
+{
+  "name": "demo launch, day trip (4 persons, electric + solar)",
+  "person_kg": 85,
+  "items": [
+    {"name": "Hull structure (plywood + glass)", "kg": 240, "count": 1, "x": 2.6, "z": 0.35, "class": "lightship"},
+    {"name": "Deck, console, interior", "kg": 85, "count": 1, "x": 2.2, "z": 0.55, "class": "lightship"},
+    {"name": "LiFePO4 battery 48 V 5 kWh (incl. BMS)", "kg": 65, "count": 1, "x": 2.2, "z": 0.30, "class": "lightship"},
+    {"name": "Electric outboard 6 kW + mount", "kg": 48, "count": 1, "x": 0.15, "z": 0.55, "class": "lightship"},
+    {"name": "Solar roof + 2 panels", "kg": 40, "count": 1, "x": 2.6, "z": 1.05, "class": "lightship"},
+    {"name": "Crew", "kg": 75, "count": 4, "x": 2.4, "z": 0.65, "class": "payload"},
+    {"name": "Gear, cooler, safety equipment", "kg": 60, "count": 1, "x": 2.2, "z": 0.45, "class": "payload"}
+  ]
+}
