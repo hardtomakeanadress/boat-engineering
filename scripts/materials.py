@@ -121,6 +121,9 @@ def build(h, people=2, roof_n=0, ply_mm=6, sheet_mm=(2440, 1220),
         ("Propulsion", motor, "by design"),
         ("Battery", battery, "by design"),
         ("Wiring", "50 mm2 tinned copper + 125 A fuse at battery", "4-6 m"),
+        ("Oarlocks + oars", "2 rowlock sockets at the rowing station "
+                            f"({lay.get('x_oarlock', 0):.2f} m from the "
+                            "transom) + collars", "1 pair + 2 oars"),
         ("Flotation", "closed-cell foam blocks or pour foam, under the "
                       "benches + bow locker (USCG-style swamped support)",
          f"~{foam_l} L ({support:.0f} kg kept afloat)"),

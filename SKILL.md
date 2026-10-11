@@ -49,6 +49,18 @@ mark it REF and ask the user; do not invent dimensions.
    checks (GM, freeboard, capacity vs standard), warnings, and every command
    that produced a number (reproducible).
 
+**Plan-package checklist (census of 60+ real plans, 2026-10-11; raw
+reports in `~/boat/online plans/`).** A complete small-craft package
+ships, ranked by how universal each item is: (1) lines plan, 3 views;
+(2) table of offsets; (3) construction details (station molds + setup
+table, midship sections, rail/joint details); (4) build sequence;
+(5) materials list with computed quantities; (6) general arrangement /
+layout. Small boats additionally carry: swamped-flotation design,
+capacity plate, sheet-count budgeting, oarlock positions, weight
+(cartop) and "build a model first". FREE plans routinely omit offsets,
+BOM quantities and flotation - never omit them here. Everything ships
+DIMENSIONED on engineering-drafting specs, never label-only sketches.
+
 ## Offsets format (hull JSON)
 
 ```json
@@ -75,12 +87,14 @@ occlusion_test numpy+matplotlib+scipy)
 | `scripts/stability.py` | GM + GZ curve (heave solved per heel angle, no trim), deck-immersion angle |
 | `scripts/budget.py` | items -> total/LCG/KG, equilibrium draft, GM, capacity cap |
 | `scripts/linesplan.py` | drawing spec (profile/half-breadth/body plan) + offsets CSV/MD |
+| `scripts/construction.py` | construction sheet: station molds + setup table + midship + sequence |
+| `scripts/materials.py` | bill of materials from the model: ply sheets, timber, tape, epoxy, flotation, USCG capacity plate |
 | `scripts/view3d.py` | shaded 3D views from six sides + waterline plane (needs numpy/matplotlib) |
 | `scripts/export_stl.py` | watertight scaled STL (hull + benches + gunwale + solar canopy; `--scale 24`, `--roof-n`) |
 | `scripts/render_stl.py` | per-part coloured z-buffer sheets of an STL (+ parts + exploded) |
 | `scripts/slice_check.py` | layer-by-layer slice audit of an STL: closed contours, wall gaps |
 | `scripts/occlusion_test.py` | marker-wall see-through test (hull must be opaque) |
-| `scripts/designer.py` | easy local web UI (sliders → live 3D + numbers, one-click plan/STL export; port 8765, files in ~/boat) |
+| `scripts/designer.py` | easy local web UI (sliders → live 3D + numbers, one-click plan/STL export; port 8765, plans in ~/boat/plans) |
 
 Pipeline example (demo boat: the numbers below come from
 `examples/example_budget.json` — swap in your own):

@@ -498,17 +498,28 @@ def hull_triangles(h, n_per_half=48, wall=0.025, ply=0.006, roof_n=0,
                 _check(rq, f"bench {bi} riser")
                 boxes.append(rq)
             if 2 * bench_cols[0][1][-1][0] > _des.POST_SPAN:
-                # centre post: its foot must follow the RISING sole toward
-                # the bow (rocker), else it pokes through the bottom
-                # the post stands on the INNER bottom (no floor plate):
-                # the highest inner keel under its footprint, buried
-                zb2 = None
-                for st in h_in["stations"]:
-                    if abs(st["x"] - bn["xc"]) <= _des.POST_SZ:
-                        z = st["pts"][0][1] - _des.GLUE_SINK
-                        zb2 = z if zb2 is None else max(zb2, z)
-                if zb2 is None:
-                    zb2 = z_sole - _des.GLUE_SINK
+                # centre post foot on the INNER bottom under its own
+                # footprint: sample the inner-keel curve at both ends of
+                # the footprint and the middle, take the highest (rocker
+                # rises toward the bow; z_sole is a GLOBAL floor and can
+                # sit below the local bottom - that poked through)
+                def _keel_z(xq):
+                    sts_i = h_in["stations"]
+                    for i in range(len(sts_i) - 1):
+                        a, bb2 = sts_i[i], sts_i[i + 1]
+                        if a["x"] <= xq <= bb2["x"]:
+                            t = ((xq - a["x"]) / (bb2["x"] - a["x"])
+                                 if bb2["x"] != a["x"] else 0.0)
+                            return (a["pts"][0][1]
+                                    + t * (bb2["pts"][0][1] - a["pts"][0][1]))
+                    return sts_i[-1]["pts"][0][1]
+                zb2 = max(_keel_z(bn["xc"] - _des.POST_SZ),
+                          _keel_z(bn["xc"]),
+                          _keel_z(bn["xc"] + _des.POST_SZ))
+                # foot sits ON the inner bottom: a GLUE_SINK burial would
+                # dip under the inner skin (laminate IS the hull part) and
+                # read as a poke; 0.2 mm real proud touches at print scale
+                zb2 += 0.0002
                 if z_bot - zb2 > 0.05:      # post runs to the bench underside
                     pq = box_quads(bn["xc"], 0.0,
                                    (zb2 + z_bot) / 2.0,

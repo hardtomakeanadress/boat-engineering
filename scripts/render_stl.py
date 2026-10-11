@@ -155,12 +155,19 @@ def classify(tris, groups, hull_json=None):
             # the people count whose layout matches - otherwise every
             # bench/riser expectation is off and they all read UNKNOWN
             n_bench_det = 0
+            x_min = float(allv[:, 0].min())
             for gg in groups[1:]:
                 pp = tris[gg].reshape(-1, 3)
                 bx = (pp[:, 0].max() - pp[:, 0].min()) / span[0]
                 by = (pp[:, 1].max() - pp[:, 1].min()) / span[1]
                 bz = (pp[:, 2].max() - pp[:, 2].min()) / span[2]
-                if 0.02 < bx < 0.14 and 0.45 < by < 1.0 and bz < 0.12:
+                # a bench NEVER lives in the bow quarter: without this the
+                # short foredeck plate (same thickness class) was counted
+                # as a bench and the people-count pick went wrong
+                cx = (pp[:, 0].max() + pp[:, 0].min()) / 2.0
+                cx_rel = (cx - x_min) / span[0]
+                if (0.02 < bx < 0.14 and 0.45 < by < 1.0 and bz < 0.12
+                        and cx_rel < D.BENCH_FORE_F + 0.02):
                     n_bench_det += 1
             lay = D.layout(h, {"roof_n": 0})
             if 1 <= n_bench_det <= 12 and \
@@ -201,9 +208,11 @@ def classify(tris, groups, hull_json=None):
                              (bn["half"] - D.RISER_T / 2) / beam,
                              (z_seat - D.RISER_TOP - D.RISER_T / 2) / zt)))
                 # the riser hugs the flared wall: its swept y-extent follows
-                # the flare over its 60 mm height - size gate allows for it
+                # the flare over its 60 mm height. The band is centred so a
+                # tight wall (RISER_T only) and the max flare at the widest
+                # station (RISER_T + sweep, ~1.2x) both land mid-band.
                 exp_size[f"riser{bi + 1}"] = (D.SEAT_W + 2 * D.RISER_EXT,
-                                              D.RISER_T * 3.0)
+                                              D.RISER_T * 1.5)
                 exp.append((f"post{bi + 1}", _darker(_darker(bcol)),
                             (bn["xc"] / loa, 0.0,
                              (z_sole + z_seat) / 2.0 / zt)))

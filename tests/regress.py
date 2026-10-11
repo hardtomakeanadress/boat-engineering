@@ -425,8 +425,15 @@ check("13-station plan not flagged non-uniform",
 
 # --- seating + solar roof layout ---
 lay_t = designer.layout(hh_p, {"roof_n": 1})
-check("cross benches with helm seat",
-      1 <= len(lay_t["benches"]) <= 4 and lay_t["benches"][0]["helm"])
+# benches ride at the ROWING STATION (the oarlocks); a transom/helm bench
+# exists only as an ADDITION in multi-bench layouts (census rule: a
+# transom-only seat cannot be rowed from)
+check("benches sit at the oarlocks (helm bench only in multi-bench layouts)",
+      1 <= len(lay_t["benches"]) <= 4
+      and any(abs(b["xc"] - lay_t["x_oarlock"]) < 1e-12
+              for b in lay_t["benches"])
+      and (len(lay_t["benches"]) == 1
+           or any(b["helm"] for b in lay_t["benches"])))
 # the bench COUNT follows people x what one bench seats on THIS hull:
 # a narrow hull with one aboard gets ONE thwart, not three
 import subprocess as _sp
@@ -440,6 +447,18 @@ check("bench count follows the people aboard (canoe: 1 person = 1 thwart)",
                                     "seat_h": 0.30})["benches"]) == 1
       and len(designer.layout(_hc, {"roof_n": 0, "people": 4,
                                     "seat_h": 0.30})["benches"]) == 4)
+# SOLO: the single bench is the ROWING thwart at the oarlocks amidships -
+# never only a transom bench (you cannot row from there: no oar spread,
+# stern-down trim - census rule from the real plans)
+_lay1 = designer.layout(_hc, {"roof_n": 0, "people": 1, "seat_h": 0.30})
+check("solo bench sits AT the rowing station, not the transom",
+      _lay1["benches"][0]["xc"] == _lay1["x_oarlock"]
+      and 0.40 <= _lay1["x_oarlock"] / 3.0 <= 0.60)
+_lay4 = designer.layout(_hc, {"roof_n": 0, "people": 4, "seat_h": 0.30})
+check("rowing thwart stays pinned at the oarlocks in a full layout",
+      any(b["helm"] for b in _lay4["benches"])
+      and any(abs(b["xc"] - _lay4["x_oarlock"]) < 1e-12
+              for b in _lay4["benches"]))
 # the rails + the end caps are FUSED into the hull profile and the end
 # plates: build the augmented profiles and check the band is part of them
 _hwr = view3d.hull_with_rails(hull.load_hull(EX))
@@ -561,6 +580,18 @@ import slice_check as _sl
 _tv = _np.array([[[0.0, 0.0, 0.0], [1.0, 0.0, 1.0], [0.0, 1.0, 2.0]]])
 _segs, _ = _sl.slice_layer(_tv, 1.0)
 check("slice through a vertex yields a segment", len(_segs) >= 1)
+# slice_check endpoint pairing must be DISTANCE-based: the old grid-bin
+# match split endpoints 0.0002 mm apart across a 0.02 cell boundary and
+# read perfectly closed layers as open contours (at the tapered stem it
+# cost 20+ layers). Square with a micro-crack straddling the boundary.
+_sq = _np.array([[[0.0, 0.0], [1.0, 0.0]], [[1.0, 0.0], [1.0, 1.0]],
+                 [[1.0, 1.0], [0.0301, 1.0]], [[0.0299, 1.0], [0.0, 1.0]],
+                 [[0.0, 1.0], [0.0, 0.0]]])
+_slq, _slopen = _sl.chain_loops(_sq)
+check("slice_check pairs endpoints by DISTANCE (micro-cracks across "
+      "grid bins close)",
+      len(_slopen) == 0 and len(_slq) == 1)
+
 # no 75% length cap: a wide 4 m jon takes 4 panels as a 2x2 block
 # bottom-f 1.0 = true box (the old 0.85/0.9/0.95 caps drifted and the
 # round-bilge branch degenerated at exactly 1.0)

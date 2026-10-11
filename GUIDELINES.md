@@ -51,6 +51,19 @@ The end-of-change checklist is mandatory — a change is not done until it runs.
 - Use numerical tolerances expressed in the quantity's unit and justified by the requirement.
 - Never silently substitute a default demo boat in a parameterized test; report skipped/empty cases explicitly.
 
+## Layout rules (learned from the plan census - binding)
+
+- The rowing station (oarlocks) sits at/near maximum beam within the
+  middle half of the boat; the rowing thwart rides AT that station.
+- A solo boat gets the rowing thwart amidships - never only a transom
+  bench (unrowable, stern-down trim). The transom/helm bench is for a
+  tiller motor, in addition to a rowing thwart - not instead of it.
+- Oarlock positions are dimensioned on the GA sheet and priced in the
+  BOM; flotation and the USCG capacity plate are part of every package.
+- Reports/raw study data from research live in `~/boat/online plans/`;
+  the distilled rules live in `references/small-boat-plans-survey.md`.
+  Cite them; do not re-derive layout practice from scratch.
+
 ## Adding features
 
 - Identify every new feature's inputs, derived values, UI controls, saved fields, history behavior, and endpoints before coding.

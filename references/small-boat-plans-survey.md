@@ -59,3 +59,31 @@ Sources:
   glued + filleted/taped to the hull sides (rule 1+2); a centre post only on
   spans over 1.6 m. No legs on the floor (that was wrong).
 - GA sheet notes carry the riser/taping callout so the plan shows intent.
+
+## Rowing station + solo seating (plan census 2026-10-11)
+
+Follow-up census (60+ plans, 19 authoritative sources; raw reports in
+`~/boat/online plans/`). The rowing-boat practice, confirmed across the
+Duckworks free plans (OarMouse, Light Trow, Cinderella, Julie Skiff),
+Apple Pie, Western Skiff, Simbo II:
+
+8. **The rowing thwart sits AT the oarlocks, near maximum beam.** Oars
+   cross the gunwale where the boat is widest; the oarsman's thwart is at
+   that station (plans give "oarlock position" as a gunwale dimension,
+   one hand-span forward of the thwart edge).
+9. **A solo boat gets the rowing thwart amidships - NEVER only a transom
+   bench.** From the transom you cannot row (no oar spread, no foot
+   bracing) and one person aft trims the bow up. This is what the user
+   caught in our builder: people=1 used to put the single bench at the
+   helm/transom station.
+10. Helm bench aft (tiller reach) exists when there is a motor; with both,
+    the layout is helm aft + rowing thwart at the oarlocks + any further
+    benches spread toward the bow.
+11. Oarlock hardware (sockets/rowlocks + oars) is part of the package -
+    priced and drawn, not assumed.
+
+Builder change: `designer.layout()` places the solo bench at
+`x_oarlock` (widest station within the middle half), keeps a rowing
+thwart pinned at `x_oarlock` in every multi-bench layout, exposes
+`x_oarlock` for the GA sheet (oarlock marks + note) and the BOM
+(oarlocks + oars row).

@@ -301,6 +301,15 @@ def layout(h, p):
     yz_seat = [y_z(s["pts"], z_seat) for s in h["stations"]]
     x_helm = max(0.5, BENCH_AFT_F * loa)
     x_end = BENCH_FORE_F * loa
+    # ROWING STATION (plan census): oars cross the gunwale at/near the
+    # widest beam, and the rowing thwart sits AT that station amidships -
+    # real plans never make the transom bench the only seat, you cannot
+    # row from there (no oar spread, no trim). Widest station within the
+    # middle half so boxy hulls (max beam at the transom) still row well.
+    mid_lo, mid_hi = xs[0] + 0.35 * loa, xs[0] + 0.65 * loa
+    _cand = [i for i in range(len(xs)) if mid_lo <= xs[i] <= mid_hi]
+    x_oar = (xs[max(_cand, key=lambda i: ye[i])] if _cand
+             else xs[0] + 0.5 * loa)
     # bench COUNT follows the people you seat and what one bench seats on
     # THIS hull: a canoe with one aboard gets ONE thwart, not three
     try:
@@ -311,14 +320,21 @@ def layout(h, p):
     s_est = max(1, int((2.0 * half_mid) // PERS_W))     # seats per bench
     n_rows = max(1, min(4, -(-max(1, n_people) // s_est))) if n_people > 0 \
         else 1
+    # SOLO: one thwart, at the rowing station (not the transom: rowing +
+    # trim). Elsewhere: helm bench aft (tiller) + rowing thwart at the
+    # oarlocks + any further benches spread toward the bow.
+    if n_rows == 1:
+        xcs = [x_oar]
+    else:
+        xcs = [x_helm, x_oar]
+        xcs += [x_oar + k * (x_end - x_oar) / (n_rows - 2)
+                for k in range(1, n_rows - 1)]      # n_rows >= 3
     benches = []
-    for i in range(n_rows):
-        xc = (x_helm + i * (x_end - x_helm) / (n_rows - 1)
-              if n_rows > 1 else x_helm)
+    for xc in xcs:
         half = max(BENCH_HALF_MIN, ixv(yz_seat, xc) - 0.01)
         benches.append({"xc": xc, "w": SEAT_W, "half": half,
                         "seated": int((2.0 * half) // PERS_W),   # a narrow bench seats nobody
-                        "helm": i == 0})
+                        "helm": abs(xc - x_helm) < 1e-9})
     roof = None
     roof_note = None
     try:
@@ -398,7 +414,7 @@ def layout(h, p):
     # plate closes the hull) - 'aft' used to cover the motor clamp area
     return {"loa": loa, "benches": benches, "roof": roof,
             "roof_note": roof_note, "z_sole": z_sole, "z_seat": z_seat,
-            "decks": decks}
+            "decks": decks, "x_oarlock": x_oar}
 
 
 def canopy_struct(h, r):
@@ -867,6 +883,15 @@ def hull_path():
     return os.path.join(STATE["outdir"], "hull.json")
 
 
+def plans_path(*parts):
+    """Drawing outputs live in <outdir>/plans - they are the deliverable
+    the user keeps, and they must never mix with the machine files
+    (hull.json, boat.stl, logs) or be overwritten by mistake."""
+    d = os.path.join(STATE["outdir"], "plans")
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, *parts)
+
+
 def fnum(params, key):
     return f'{float(params[key]):g}'
 
@@ -1069,26 +1094,26 @@ def make_plan():
         return {"ok": False, "error": "no valid loading condition - the boat "
                 "cannot float this load; reduce the load first"}
     with LOCK:
-        spec = os.path.join(STATE["outdir"], "linesplan.spec.json")
+        spec = plans_path("linesplan.spec.json")
         res = run(["python3", os.path.join(HERE, "linesplan.py"), hull_path(),
                    "-o", spec, "--draft", f"{STATE['draft']:.3f}",
-                   "--offsets", os.path.join(STATE["outdir"], "offsets.csv")])
+                   "--offsets", plans_path("offsets.csv")])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
         res2 = run(["python3", DRAFT_PY, spec, "--out",
-                    os.path.join(STATE["outdir"], "linesplan"), "--png"])
+                    plans_path("linesplan"), "--png"])
         if res2.returncode != 0:
             return {"ok": False, "error": (res2.stderr or res2.stdout)[-300:]}
         return {"ok": True, "files": [
-            "/files/linesplan.pdf", "/files/linesplan.dxf",
-            "/files/linesplan.png", "/files/offsets.csv"]}
+            "/files/plans/linesplan.pdf", "/files/plans/linesplan.dxf",
+            "/files/plans/linesplan.png", "/files/plans/offsets.csv"]}
 
 
 def make_construction():
     """Construction plan: station molds, mold table, midship, setup steps."""
     with LOCK:
         p = STATE.get("params") or {}
-        spec = os.path.join(STATE["outdir"], "construction.spec.json")
+        spec = plans_path("construction.spec.json")
         res = run(["python3", os.path.join(HERE, "construction.py"),
                    hull_path(), "-o", spec,
                    "--people", str(int(p.get("people", 2) or 2)),
@@ -1098,18 +1123,18 @@ def make_construction():
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
         res2 = run(["python3", DRAFT_PY, spec, "--out",
-                    os.path.join(STATE["outdir"], "construction"), "--png"])
+                    plans_path("construction"), "--png"])
         if res2.returncode != 0:
             return {"ok": False, "error": (res2.stderr or res2.stdout)[-300:]}
-        return {"ok": True, "files": ["/files/construction.pdf",
-                                      "/files/construction.png"]}
+        return {"ok": True, "files": ["/files/plans/construction.pdf",
+                                      "/files/plans/construction.png"]}
 
 
 def make_materials():
     """Bill of materials: everything computed from the model."""
     with LOCK:
         p = STATE.get("params") or {}
-        out = os.path.join(STATE["outdir"], "materials.md")
+        out = plans_path("materials.md")
         cmd = ["python3", os.path.join(HERE, "materials.py"), hull_path(),
                "-o", out,
                "--people", str(int(p.get("people", 2) or 2)),
@@ -1122,7 +1147,8 @@ def make_materials():
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
         md = open(out).read()
-        return {"ok": True, "files": ["/files/materials.md"], "report": md}
+        return {"ok": True, "files": ["/files/plans/materials.md"],
+                "report": md}
 
 
 def make_views():
@@ -1132,7 +1158,7 @@ def make_views():
     with LOCK:
         p = STATE.get("params") or {}
         res = run(["python3", os.path.join(HERE, "view3d.py"), hull_path(),
-                   "-o", os.path.join(STATE["outdir"], "preview3d"),
+                   "-o", plans_path("preview3d"),
                    "--draft", f"{STATE['draft']:.3f}",
                    "--roof-n", str(int(p.get("roof_n", 0) or 0)),
                    "--ply-mm", str(int(p.get("ply_mm", 6) or 6)),
@@ -1141,7 +1167,8 @@ def make_views():
                    "--people", str(int(p.get("people", 2) or 2))])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
-        return {"ok": True, "files": ["/files/preview3d.png", "/files/preview3d.pdf"]}
+        return {"ok": True, "files": ["/files/plans/preview3d.png",
+                                      "/files/plans/preview3d.pdf"]}
 
 
 def make_layout():
@@ -1192,6 +1219,18 @@ def make_layout():
                 ys = yct - hb + si * 2.0 * hb / bn["seated"]
                 ent_t.append({"type": "line", "layer": "STATION",
                               "p1": [xa_, ys], "p2": [xb2, ys]})
+        # oarlock pair at the ROWING STATION, both gunwales (census: the
+        # oars cross at max beam and the rowing thwart sits there)
+        xo_mm = float(lay.get("x_oarlock") or 0.0) * 1000.0
+        if xo_mm:
+            yo_mm = interp(ye, xo_mm)
+            for sy in (1, -1):
+                ent_t.append({"type": "polyline", "closed": True,
+                              "layer": "CENTER",
+                              "points": [[X(xo_mm - 40), yct + sy * (yo_mm + 40)],
+                                         [X(xo_mm + 40), yct + sy * (yo_mm + 40)],
+                                         [X(xo_mm + 40), yct + sy * (yo_mm - 80)],
+                                         [X(xo_mm - 40), yct + sy * (yo_mm - 80)]]})
         # ---- propulsion kit: WHERE IT GOES (outboard on the open transom,
         # batteries LOW under the helm bench).  Two small callouts only -
         # the details live in the title-block notes (no floating clutter).
@@ -1214,7 +1253,8 @@ def make_layout():
         for j, s__ in enumerate((
                 "rect behind transom = OUTBOARD (clamps the open transom)",
                 "box at helm bench = 2 x LiFePO4 100 Ah, LOW under the bench",
-                "line = 50 mm2 cable: switch + 125 A fuse at battery -> motor")):
+                "line = 50 mm2 cable: switch + 125 A fuse at battery -> motor",
+                "boxes at the sheer = OARLOCK pair at the rowing station")):
             txt_t.append({"pos": [ox, ky - j * P(7)], "h": P(4), "s": s__,
                           "align": "left", "layer": "TEXT"})
         r = lay.get("roof")
@@ -1279,10 +1319,17 @@ def make_layout():
             if not cs_l["fit"]:
                 notes.append("NO 450 W panel fits this roof - make the roof "
                              "longer or the boat wider")
-        notes.append(f"{len(lay['benches'])} cross benches on side risers "
-                     "(glued + fillet/taped), aft = helm (tiller) -> "
-                     f"{sum(bb['seated'] for bb in lay['benches'])} seated "
-                     "(ISO 14946)")
+        _helm = any(bb["helm"] for bb in lay["benches"])
+        notes.append(f"{len(lay['benches'])} cross bench(es) on side risers "
+                     "(glued + fillet/taped)" +
+                     (", aft = helm (tiller)" if _helm else
+                      ", at the rowing station") +
+                     f" -> {sum(bb['seated'] for bb in lay['benches'])} "
+                     "seated (ISO 14946)")
+        if lay.get("x_oarlock"):
+            notes.append(f"Oarlock pair {lay['x_oarlock']:.2f} m from the "
+                         "transom (row from that thwart; tiller extension "
+                         "when motoring solo)")
         notes.append("Panels flat-mounted, ~25 mm air gap (Z-brackets)")
         notes.append("Foredeck fore; transom open for motor")
         notes.append("Equipment: 24 V 3 kW outboard (open transom)")
@@ -1301,16 +1348,16 @@ def make_layout():
                            "dims": dims_t},
                           {"name": "", "entities": ent_s, "texts": txt_s,
                            "dims": dims_s}]}
-        spath = os.path.join(STATE["outdir"], "arrangement.spec.json")
+        spath = plans_path("arrangement.spec.json")
         with open(spath, "w") as f:
             json.dump(spec, f)
         res = run(["python3", DRAFT_PY, spath, "--out",
-                   os.path.join(STATE["outdir"], "arrangement"), "--png"])
+                   plans_path("arrangement"), "--png"])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
-        return {"ok": True, "files": ["/files/arrangement.pdf",
-                                      "/files/arrangement.dxf",
-                                      "/files/arrangement.png"]}
+        return {"ok": True, "files": ["/files/plans/arrangement.pdf",
+                                      "/files/plans/arrangement.dxf",
+                                      "/files/plans/arrangement.png"]}
 
 
 def make_roof_plan():
@@ -1474,15 +1521,15 @@ def make_roof_plan():
                           {"name": "", "entities": ent_s, "texts": txt_s,
                            "dims": dims_s}]}
         outs = []
-        spath = os.path.join(STATE["outdir"], "roof_plan.spec.json")
+        spath = plans_path("roof_plan.spec.json")
         with open(spath, "w") as f:
             json.dump(spec, f)
         res = run(["python3", DRAFT_PY, spath, "--out",
-                   os.path.join(STATE["outdir"], "roof_plan"), "--png"])
+                   plans_path("roof_plan"), "--png"])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
-        outs += ["/files/roof_plan.pdf", "/files/roof_plan.dxf",
-                 "/files/roof_plan.png"]
+        outs += ["/files/plans/roof_plan.pdf", "/files/plans/roof_plan.dxf",
+                 "/files/plans/roof_plan.png"]
 
         # ---------------- sheet 2: section A-A at 1:5 ----------------
         s2 = 5
@@ -1575,15 +1622,16 @@ def make_roof_plan():
                  "notes": notes2,
                  "views": [{"name": "", "entities": ent_c, "texts": txt_c,
                             "dims": dims_c}]}
-        spath2 = os.path.join(STATE["outdir"], "roof_section.spec.json")
+        spath2 = plans_path("roof_section.spec.json")
         with open(spath2, "w") as f:
             json.dump(spec2, f)
         res = run(["python3", DRAFT_PY, spath2, "--out",
-                   os.path.join(STATE["outdir"], "roof_section"), "--png"])
+                   plans_path("roof_section"), "--png"])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
-        outs += ["/files/roof_section.pdf", "/files/roof_section.dxf",
-                 "/files/roof_section.png"]
+        outs += ["/files/plans/roof_section.pdf",
+                 "/files/plans/roof_section.dxf",
+                 "/files/plans/roof_section.png"]
         return {"ok": True, "files": outs}
 
 
@@ -1755,7 +1803,8 @@ select{padding:5px 6px;border-radius:6px;border:1px solid #8aa;background:#f4f7f
   <div class="row"><label><input type="checkbox" id="stl_roof" checked> STL includes the solar roof + supports</label></div>
  </details>
  <div id="outputs"></div>
- <div class="desc" style="margin-top:10px">Files land in ~/boat. Move any
+ <div class="desc" style="margin-top:10px">Drawings land in
+ ~/boat/plans; boat.stl + live preview in ~/boat. Move any
  slider &mdash; the boat redraws in ~1 s. Rating check = ISO-style offset-load
  estimate (85 kg crew test), not a certified rating.</div>
 </div>
@@ -2234,7 +2283,7 @@ def main():
         generate({})
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(f"Boat builder running: http://127.0.0.1:{args.port}/  "
-          f"(files in {STATE['outdir']})")
+          f"(plans in {STATE['outdir']}/plans)")
     srv.serve_forever()
 
 

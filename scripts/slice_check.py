@@ -94,24 +94,18 @@ def chain_loops(segs, tol=0.02):
         pts[2 * i + 1] = q
     # pair endpoints 2-by-2 at every junction: welded seams make multi-way
     # junctions where several chains meet - one-partner-each broke there
-    # and read the seam as open contours
-    keys = [tuple(np.round(pts[i] / tol)) for i in range(2 * n)]
-    groups = {}
-    for i, k in enumerate(keys):
-        groups.setdefault(k, []).append(i)
+    # and read the seam as open contours. TRUE distance pairing (KD-tree,
+    # nearest first): grid-bin rounding split endpoints just 0.005 apart
+    # across a cell boundary at the tapered stem and read open contours.
+    tree = cKDTree(pts)
+    cand = tree.query_pairs(tol, output_type="ndarray")
     partner = {}
-    for ends in groups.values():
-        pool = list(ends)
-        while len(pool) >= 2:
-            a = pool.pop(0)
-            found = None
-            for bi, b in enumerate(pool):
-                if b // 2 != a // 2:
-                    found = bi
-                    break
-            if found is None:
-                break
-            b = pool.pop(found)
+    if len(cand):
+        dd = np.linalg.norm(pts[cand[:, 0]] - pts[cand[:, 1]], axis=1)
+        for a, b in cand[np.argsort(dd, kind="stable")]:
+            a, b = int(a), int(b)
+            if a in partner or b in partner or a // 2 == b // 2:
+                continue
             partner[a] = b
             partner[b] = a
     open_pts = [pts[i] for i in range(2 * n) if i not in partner]
