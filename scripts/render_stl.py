@@ -150,7 +150,26 @@ def classify(tris, groups, hull_json=None):
         import designer as D
         if hull_json and os.path.exists(hull_json):
             h = H.load_hull(hull_json)
+            # the bench count follows the PEOPLE slider and lives in the
+            # STL, not the hull file: detect bench-sized bodies and pick
+            # the people count whose layout matches - otherwise every
+            # bench/riser expectation is off and they all read UNKNOWN
+            n_bench_det = 0
+            for gg in groups[1:]:
+                pp = tris[gg].reshape(-1, 3)
+                bx = (pp[:, 0].max() - pp[:, 0].min()) / span[0]
+                by = (pp[:, 1].max() - pp[:, 1].min()) / span[1]
+                bz = (pp[:, 2].max() - pp[:, 2].min()) / span[2]
+                if 0.02 < bx < 0.14 and 0.45 < by < 1.0 and bz < 0.12:
+                    n_bench_det += 1
             lay = D.layout(h, {"roof_n": 0})
+            if 1 <= n_bench_det <= 12 and \
+                    len(lay["benches"]) != n_bench_det:
+                for _p in range(1, 13):
+                    _l2 = D.layout(h, {"roof_n": 0, "people": _p})
+                    if len(_l2["benches"]) == n_bench_det:
+                        lay = _l2
+                        break
             loa = lay["loa"]
             ed = [max(s["pts"], key=lambda q: (round(q[0], 9), q[1]))
                   for s in h["stations"]]

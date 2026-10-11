@@ -272,7 +272,16 @@ def layout(h, p):
     yz_seat = [y_z(s["pts"], z_seat) for s in h["stations"]]
     x_helm = max(0.5, BENCH_AFT_F * loa)
     x_end = BENCH_FORE_F * loa
-    n_rows = 3 if loa < BENCH_4_SPLIT else 4
+    # bench COUNT follows the people you seat and what one bench seats on
+    # THIS hull: a canoe with one aboard gets ONE thwart, not three
+    try:
+        n_people = max(0, int(float(p.get("people", 2) or 0)))
+    except (TypeError, ValueError):
+        n_people = 2
+    half_mid = ixv(yz_seat, 0.5 * (x_helm + x_end))
+    s_est = max(1, int((2.0 * half_mid) // PERS_W))     # seats per bench
+    n_rows = max(1, min(4, -(-max(1, n_people) // s_est))) if n_people > 0 \
+        else 1
     benches = []
     for i in range(n_rows):
         xc = (x_helm + i * (x_end - x_helm) / (n_rows - 1)
@@ -1048,7 +1057,8 @@ def make_views():
                    "--roof-n", str(int(p.get("roof_n", 0) or 0)),
                    "--ply-mm", str(int(p.get("ply_mm", 6) or 6)),
                    "--seat-h", str(float(p.get("seat_h", 0.38) or 0.38)),
-                   "--roof-h", str(float(p.get("roof_h", 1.0) or 1.0))])
+                   "--roof-h", str(float(p.get("roof_h", 1.0) or 1.0)),
+                   "--people", str(int(p.get("people", 2) or 2))])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
         return {"ok": True, "files": ["/files/preview3d.png", "/files/preview3d.pdf"]}
@@ -1576,7 +1586,8 @@ def make_stl():
                    "--ply-mm", str(int(p.get("ply_mm", 6) or 6)),
                    "--roof-n", str(0 if bare else roof),
                    "--seat-h", str(float(p.get("seat_h", 0.38) or 0.38)),
-                   "--roof-h", str(float(p.get("roof_h", 1.0) or 1.0))])
+                   "--roof-h", str(float(p.get("roof_h", 1.0) or 1.0)),
+                   "--people", str(int(p.get("people", 2) or 2))])
         if res.returncode != 0:
             return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
         return {"ok": True, "files": ["/files/boat.stl"],
@@ -1650,15 +1661,17 @@ select{padding:5px 6px;border-radius:6px;border:1px solid #8aa;background:#f4f7f
  <div id="export">
   <button onclick="views()">3D views</button>
   <button onclick="plan()">Lines plan</button>
-  <button onclick="ga()">Layout: seats + roof</button>
-  <button onclick="roofdetail()">Roof detail: frame</button>
+  <button onclick="stl()">Export STL (1:24 - resize in slicer)</button>
  </div>
- <div class="row"><label>STL model <button onclick="stl()">Export STL (1:24 - resize in slicer)</button>
+ <details><summary>More: layout sheets, layers, audit</summary>
+  <div class="row">
+   <button onclick="ga()">Layout: seats + roof</button>
+   <button onclick="roofdetail()">Roof detail: frame</button>
    <button onclick="layers()">Layer viewer</button>
-   <button onclick="audit()">Audit parts</button></label>
-  <label style="justify-content:flex-start;gap:8px"><input type="checkbox"
-   id="stl_roof" checked> STL includes the solar roof + supports (uncheck to
-   print the bare hull)</label></div>
+   <button onclick="audit()">Audit parts</button>
+  </div>
+  <div class="row"><label><input type="checkbox" id="stl_roof" checked> STL includes the solar roof + supports</label></div>
+ </details>
  <div id="outputs"></div>
  <div class="desc" style="margin-top:10px">Files land in ~/boat. Move any
  slider &mdash; the boat redraws in ~1 s. Rating check = ISO-style offset-load

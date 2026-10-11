@@ -37,7 +37,7 @@ def build(h, opt, s):
     P = lambda mm: mm * s
     sheet_w, sheet_h = opt["sheet_wh"]
     W, H = sheet_w * s, sheet_h * s
-    M, D, G = P(12), P(18), P(36)
+    M, D, G = P(12), P(18), P(46)   # G: clear of the profile's dim chains
 
     sts = h["stations"]
     xs = [st["x"] * 1000.0 for st in sts]
@@ -107,11 +107,15 @@ def build(h, opt, s):
     txt.append({"pos": [ox + loa / 2, y0p + z_max + P(9)], "h": P(4),
                 "s": "PROFILE", "align": "center"})
     dims = [{"kind": "linear", "axis": "x", "p1": [X(xs[0]), y0p],
-             "p2": [X(xs[-1]), y0p], "off": -P(12)},
-            {"kind": "linear", "axis": "x", "p1": [X(xs[0]), y0p],
-             "p2": [X(xs[1]), y0p], "off": -P(24)},
-            {"kind": "linear", "axis": "y", "p1": [X(xs[-1]), y0p],
-             "p2": [X(xs[-1]), Y(ze[-1])], "off": P(12)}]
+             "p2": [X(xs[-1]), y0p], "off": -P(12)}]
+    for i in range(n - 1):      # spacing chain: every station dimensioned
+        dims.append({"kind": "linear", "axis": "x",
+                     "p1": [X(xs[i]), y0p], "p2": [X(xs[i + 1]), y0p],
+                     "off": -P(24)})
+    dims.append({"kind": "linear", "axis": "y", "p1": [X(xs[-1]), y0p],
+                 "p2": [X(xs[-1]), Y(ze[-1])], "off": P(12)})
+    dims.append({"kind": "linear", "axis": "y", "p1": [X(xs[0]), y0p],
+                 "p2": [X(xs[0]), Y(ze[0])], "off": -P(12)})
     views.append({"name": "PROFILE", "entities": ent, "texts": txt, "dims": dims})
     profile_right = X(xs[-1])
 
@@ -138,8 +142,15 @@ def build(h, opt, s):
                 "p2": [X(xs[-1]) + P(4), yH], "layer": "CENTER"})
     txt = [{"pos": [ox + loa / 2, yH + ym_h + P(9)], "h": P(4),
             "s": "HALF-BREADTH", "align": "center"}]
-    dims = [{"kind": "linear", "axis": "y", "p1": [X(xs[0]), yH],
-             "p2": [X(xs[0]), Yb(ym_h)], "off": -P(12)}]
+    dims = []
+    for i in range(n - 1):          # station chain under the plan
+        dims.append({"kind": "linear", "axis": "x",
+                     "p1": [X(xs[i]), yH], "p2": [X(xs[i + 1]), yH],
+                     "off": -P(12)})
+    for i in range(n):              # half-breadth at EVERY station,
+        dims.append({"kind": "linear", "axis": "y",      # staggered labels
+                     "p1": [X(xs[i]), yH], "p2": [X(xs[i]), Yb(ye[i])],
+                     "off": P(14) + (i % 3) * P(16)})
     views.append({"name": "HALF-BREADTH", "entities": ent, "texts": txt, "dims": dims})
 
     # ---------- BODY PLAN ----------
@@ -164,6 +175,7 @@ def build(h, opt, s):
         # label next to its own section curve, stepping down along the fan so
         # labels do not pile up where deck-edge heights are similar
         zl = zk[i] + (ze[i] - zk[i]) * (1.0 - LABEL_FAN * i / (n - 1))
+        zl += (i % 3) * z_max * 0.045      # 3-way stagger: labels never touch
         yl = waterline_halfwidth(sts[i]["pts"], zl / 1000.0) * 1000.0
         txt.append({"pos": [cl + yl + P(4), y0b + zl],
                     "h": P(2.5), "s": str(i), "align": "left"})

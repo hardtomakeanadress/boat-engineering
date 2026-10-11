@@ -342,7 +342,7 @@ import render_stl as _rsa
 _arra = _rsa.parse_stl('/tmp/aud_fix.stl')
 _groupsa = _rsa.bodies(_arra)
 _colsa, _namesa = _rsa.classify(_arra, _groupsa, '/tmp/hull.json')
-_bi = _namesa.index("bench2") + 1
+_bi = _namesa.index("bench1") + 1   # the default layout's first bench
 _outa = _arra.copy()
 _outa[_groupsa[_bi]] = _outa[_groupsa[_bi]] + _np.array([0.0, 0.4, 0.0])
 export_stl.write_stl('/tmp/aud_bad.stl',
@@ -426,8 +426,20 @@ check("13-station plan not flagged non-uniform",
 # --- seating + solar roof layout ---
 lay_t = designer.layout(hh_p, {"roof_n": 1})
 check("cross benches with helm seat",
-      3 <= len(lay_t["benches"]) <= 4 and lay_t["benches"][0]["helm"]
-      and 3 <= sum(bb["seated"] for bb in lay_t["benches"]) <= 14)
+      1 <= len(lay_t["benches"]) <= 4 and lay_t["benches"][0]["helm"])
+# the bench COUNT follows people x what one bench seats on THIS hull:
+# a narrow hull with one aboard gets ONE thwart, not three
+import subprocess as _sp
+_rc = _sp.run(['python3', f'{B}/param_hull.py', '--loa', '3.0',
+               '--beam', '0.8', '--depth', '0.35',
+               '-o', '/tmp/h_canoe.json'], capture_output=True)
+_hc = hull.load_hull('/tmp/h_canoe.json')
+check("bench count follows the people aboard (canoe: 1 person = 1 thwart)",
+      _rc.returncode == 0
+      and len(designer.layout(_hc, {"roof_n": 0, "people": 1,
+                                    "seat_h": 0.30})["benches"]) == 1
+      and len(designer.layout(_hc, {"roof_n": 0, "people": 4,
+                                    "seat_h": 0.30})["benches"]) == 4)
 # the rails + the end caps are FUSED into the hull profile and the end
 # plates: build the augmented profiles and check the band is part of them
 _hwr = view3d.hull_with_rails(hull.load_hull(EX))

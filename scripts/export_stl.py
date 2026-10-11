@@ -318,7 +318,7 @@ def _deck_quads(h_in, i0, i1, thick):
 
 
 def hull_triangles(h, n_per_half=48, wall=0.025, ply=0.006, roof_n=0,
-                   seat_h=None, roof_h=None):
+                   seat_h=None, roof_h=None, people=None):
     """Hollow open-boat shell with consistent outward winding (unit: m).
     Outer skin + reversed inner skin + gunwale rim + end walls close into a
     watertight solid of wall thickness `wall`; benches are added as closed
@@ -405,7 +405,8 @@ def hull_triangles(h, n_per_half=48, wall=0.025, ply=0.006, roof_n=0,
         import designer as _des
         lay = _des.layout(h, {"roof_n": roof_n,
                               **({"seat_h": seat_h} if seat_h else {}),
-                              **({"roof_h": roof_h} if roof_h else {})})
+                              **({"roof_h": roof_h} if roof_h else {}),
+                              **({"people": people} if people else {})})
 
         def _check(quads, what):
             for q in quads:
@@ -670,6 +671,8 @@ def main():
                          "and panels)")
     ap.add_argument("--seat-h", type=float, default=None,
                     help="bench height above the floor [m] (page seat_h)")
+    ap.add_argument("--people", type=int, default=None,
+                    help="people aboard: the bench count follows it")
     ap.add_argument("--roof-h", type=float, default=None,
                     help="roof clear height over the deck edge [m] (page roof_h)")
     args = ap.parse_args()
@@ -682,7 +685,8 @@ def main():
     ply = int(max(3, min(18, args.ply_mm))) / 1000.0
     tris = hull_triangles(h, n_per_half=args.samples, wall=wall, ply=ply,
                           roof_n=max(0, min(8, args.roof_n)),
-                          seat_h=args.seat_h, roof_h=args.roof_h)
+                          seat_h=args.seat_h, roof_h=args.roof_h,
+                          people=args.people)
     # drop exactly-zero-area triangles (horizontal runs and closure ribbons
     # collapse some mirror-strip quads to lines); if that would open the
     # mesh, keep them - a print tolerates a degenerate, not a hole

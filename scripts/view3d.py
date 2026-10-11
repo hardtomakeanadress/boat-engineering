@@ -315,6 +315,8 @@ def main():
                     help="draw a translucent waterline plane at this draft [m]")
     ap.add_argument("--seat-h", type=float, default=None,
                     help="bench height above the floor [m] (page seat_h)")
+    ap.add_argument("--people", type=int, default=None,
+                    help="people aboard: the bench count follows it")
     ap.add_argument("--roof-h", type=float, default=None,
                     help="roof clear height over the deck edge [m] (page roof_h)")
     ap.add_argument("--roof-n", type=int, default=0,
@@ -341,6 +343,8 @@ def main():
                               **({"seat_h": args.seat_h} if args.seat_h
                                  else {}),
                               **({"roof_h": args.roof_h} if args.roof_h
+                                 else {}),
+                              **({"people": args.people} if args.people
                                  else {})})
     except Exception:
         lay = {"benches": [], "roof": None}
