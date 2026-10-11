@@ -93,6 +93,35 @@ def _gz_rows(h, mass, kg, pts, ang_step=4, ang_max=72):
     return rows
 
 
+USCG_HP_TABLE = ((35, 3.0), (39, 5.0), (42, 7.5), (45, 10.0), (52, 15.0))
+
+
+def max_hp(loa_m, transom_half_beam_m, flat_bottom=False, remote=False):
+    """USCG-style rated maximum power, 33 CFR 183.53: Factor = LOA(ft) x
+    max transom width (ft), nearest integer.  Factor <= 52 uses the table
+    (flat-bottom hard-chine boats drop one increment); above that the
+    formulas apply, rounded UP to the next multiple of 5."""
+    f = round((loa_m / 0.3048) * (2.0 * transom_half_beam_m / 0.3048))
+    if f <= 52:
+        hp = 3.0
+        for lim, v in USCG_HP_TABLE:
+            if f <= lim:
+                hp = v
+                break
+        if flat_bottom:
+            hp = max(3.0, hp - 2.5)
+        return hp, f
+    if remote:
+        hp = 2.0 * f - 90.0
+    elif flat_bottom:
+        hp = 0.5 * f - 15.0
+    else:
+        hp = 0.8 * f - 25.0
+    import math as _m
+    hp = max(0.0, _m.ceil(hp / 5.0) * 5.0)
+    return hp, f
+
+
 def persons_estimate(h, mass, loa, bwl, depth, n_sel, kg=None,
                      tpc_kgcm=None, z_crew=None):
     """ISO-style offset-load estimate: all crew (85 kg each) seated on ONE
@@ -999,6 +1028,16 @@ def generate(params):
                 "roof_clear_seat": (round(cs["zu"] - lay["z_seat"], 2)
                                     if cs else None),
             }
+            # capacity + flotation (small-boat plan essentials)
+            _flat = p["bottom_f"] >= 0.999
+            _half_tr = hull.deck_edge(h["stations"][0]["pts"])[0]
+            _hp, _fac = max_hp(p["loa"], _half_tr, flat_bottom=_flat,
+                               remote=False)
+            numbers["max_hp"] = _hp
+            numbers["hp_factor"] = _fac
+            _support = float(p["gear_kg"]) + max(1, int(p["people"])) * PERSON_KG
+            numbers["flotation_l"] = int(-(-_support / 0.95))  # 0.95 kg/L net
+            numbers["flotation_kg"] = int(_support)
             try:
                 numbers["persons"] = persons_estimate(
                     h, total, p["loa"], r["Bwl"], p["depth"],
@@ -1043,6 +1082,47 @@ def make_plan():
         return {"ok": True, "files": [
             "/files/linesplan.pdf", "/files/linesplan.dxf",
             "/files/linesplan.png", "/files/offsets.csv"]}
+
+
+def make_construction():
+    """Construction plan: station molds, mold table, midship, setup steps."""
+    with LOCK:
+        p = STATE.get("params") or {}
+        spec = os.path.join(STATE["outdir"], "construction.spec.json")
+        res = run(["python3", os.path.join(HERE, "construction.py"),
+                   hull_path(), "-o", spec,
+                   "--people", str(int(p.get("people", 2) or 2)),
+                   "--seat-h", str(float(p.get("seat_h", 0.38) or 0.38)),
+                   "--ply-mm", str(int(p.get("ply_mm", 6) or 6)),
+                   "--roof-n", str(int(p.get("roof_n", 0) or 0))])
+        if res.returncode != 0:
+            return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
+        res2 = run(["python3", DRAFT_PY, spec, "--out",
+                    os.path.join(STATE["outdir"], "construction"), "--png"])
+        if res2.returncode != 0:
+            return {"ok": False, "error": (res2.stderr or res2.stdout)[-300:]}
+        return {"ok": True, "files": ["/files/construction.pdf",
+                                      "/files/construction.png"]}
+
+
+def make_materials():
+    """Bill of materials: everything computed from the model."""
+    with LOCK:
+        p = STATE.get("params") or {}
+        out = os.path.join(STATE["outdir"], "materials.md")
+        cmd = ["python3", os.path.join(HERE, "materials.py"), hull_path(),
+               "-o", out,
+               "--people", str(int(p.get("people", 2) or 2)),
+               "--gear", str(float(p.get("gear_kg", 300) or 300)),
+               "--ply-mm", str(int(p.get("ply_mm", 6) or 6)),
+               "--roof-n", str(int(p.get("roof_n", 0) or 0))]
+        if float(p.get("bottom_f", 0) or 0) >= 0.999:
+            cmd.append("--flat-bottom")
+        res = run(cmd)
+        if res.returncode != 0:
+            return {"ok": False, "error": (res.stderr or res.stdout)[-300:]}
+        md = open(out).read()
+        return {"ok": True, "files": ["/files/materials.md"], "report": md}
 
 
 def make_views():
@@ -1665,6 +1745,8 @@ select{padding:5px 6px;border-radius:6px;border:1px solid #8aa;background:#f4f7f
  </div>
  <details><summary>More: layout sheets, layers, audit</summary>
   <div class="row">
+   <button onclick="constr()">Construction plan</button>
+   <button onclick="mats()">Materials list</button>
    <button onclick="ga()">Layout: seats + roof</button>
    <button onclick="roofdetail()">Roof detail: frame</button>
    <button onclick="layers()">Layer viewer</button>
@@ -1847,6 +1929,8 @@ async function update(){
      ` · GM ${n.gm_m} m`:'')+`<br>`+
     `Seats: <b>${n.seated!=null?n.seated:''}</b> (${n.bench_n!=null?n.bench_n:''} cross benches; aft bench = helm, tiller)`+
     (n.seat_cm!=null?` &middot; bench top <b>${n.seat_cm} cm</b> above the bottom (lowest point)`:'')+
+    (n.flotation_l?`<br>Flotation: <b>${n.flotation_l} L</b> of foam (or sealed compartments) under the benches to keep ${n.flotation_kg} kg afloat when swamped`:'')+
+    (n.max_hp?`<br>Rated max power (USCG 33 CFR 183.53, factor ${n.hp_factor}): <b>${n.max_hp} hp</b> petrol - the 24 V electric is ~4 hp equivalent`:'')+
     (n.roof_kwp?`<br>Solar roof: <b>${n.roof_area} m&sup2;</b> = ${n.roof_kwp} kWp &asymp; ${n.roof_kwh} kWh/day (July) &middot; ${n.roof_pan} &times; 450 W`:'')+
     (n.roof_clear_floor!=null?`<br>Roof underside: <b>${n.roof_clear_floor} m</b> over the floor`+
      ` <span style="color:${n.roof_clear_seat-0.95<0.02?'#a60':'#345'}">(${Math.round((n.roof_clear_seat-0.95)*100)} cm above a seated 1.8 m head)`+
@@ -1899,6 +1983,20 @@ async function views(){if(!await settle()){el('status').textContent='Cannot expo
   el('status').textContent='';
   el('outputs').innerHTML='Views: '+res.files.map(f=>`<a href="${f}" target="_blank">${f.split('/').pop()}</a>`).join(' | ');}
  catch(e){el('status').textContent='Export failed: '+e;blog('views failed: '+e);}}
+async function constr(){if(!await settle()){el('status').textContent='Cannot export: the last build failed (see message above)';return;}
+ el('status').textContent='drawing the construction plan...';
+ try{const res=await post('/api/construction',{});
+  if(!res.ok){el('status').textContent='Error: '+res.error;return;}
+  el('status').textContent='';
+  el('outputs').innerHTML='Construction: '+res.files.map(f=>`<a href="${f}" target="_blank">${f.split('/').pop()}</a>`).join(' | ');}
+ catch(e){el('status').textContent='Export failed: '+e;blog('construction failed: '+e);}}
+async function mats(){if(!await settle()){el('status').textContent='Cannot export: the last build failed (see message above)';return;}
+ el('status').textContent='listing the materials...';
+ try{const res=await post('/api/materials',{});
+  if(!res.ok){el('status').textContent='Error: '+res.error;return;}
+  el('status').textContent='';
+  el('outputs').innerHTML='Materials: <a href="/files/materials.md" target="_blank">materials.md</a><pre style="font-size:11px;white-space:pre-wrap;max-height:320px;overflow:auto;background:#f6f8fb;padding:8px;border-radius:6px">'+(res.report||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>';}
+ catch(e){el('status').textContent='Export failed: '+e;blog('materials failed: '+e);}}
 async function plan(){if(!await settle()){el('status').textContent='Cannot export: the last build failed (see message above)';return;}
  el('status').textContent='drawing plan...';
  try{const res=await post('/api/plan',{});
@@ -2035,7 +2133,8 @@ class Handler(BaseHTTPRequestHandler):
         t0 = time.time()
         notable = self.path in ("/api/plan", "/api/stl", "/api/views",
                                 "/api/layout", "/api/roof", "/api/layers",
-                                "/api/audit")
+                                "/api/audit", "/api/construction",
+                                "/api/materials")
         if notable:
             log(f"POST {self.path} {json.dumps(body)[:120]}")
         try:
@@ -2043,6 +2142,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(generate(body))
             elif self.path == "/api/plan":
                 self._json(make_plan())
+            elif self.path == "/api/construction":
+                self._json(make_construction())
+            elif self.path == "/api/materials":
+                self._json(make_materials())
             elif self.path == "/api/stl":
                 self._json(make_stl())
             elif self.path == "/api/history":

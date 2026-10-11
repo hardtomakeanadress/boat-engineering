@@ -38,7 +38,10 @@ mark it REF and ask the user; do not invent dimensions.
    `references/electric-solar-budget.md`.
 6. **Plans** — `linesplan.py` emits a drawing spec; render it with the
    engineering-drafting skill. Always also export the offsets table
-   (`--offsets`) for lofting. `view3d.py` renders shaded 3D views from six
+   (`--offsets`) for lofting. For the build itself: `construction.py`
+   (station molds + setup table + midship details + sequence) and
+   `materials.py` (bill of materials with sheet counts, flotation and
+   USCG capacity). `view3d.py` renders shaded 3D views from six
    directions plus the waterline at design draft (visualization aid). For
    physical/3D-printed models: `export_stl.py` writes a watertight STL at
    any scale (default 1:24).

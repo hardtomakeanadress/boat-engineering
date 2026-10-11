@@ -19,6 +19,8 @@ as an assumption, never sketched by eye.
 | `scripts/view3d.py` | 3D preview + the shared profile/rail geometry |
 | `scripts/hull.py`, `hydrostatics.py`, `stability.py`, `budget.py` | The numbers |
 | `scripts/linesplan.py` | Lines plan (PDF/DXF/PNG) |
+| `scripts/construction.py` | Construction plan: station molds, setup table, midship details, sequence |
+| `scripts/materials.py` | Bill of materials computed from the model: ply sheets, timber, tape, epoxy, flotation, capacity plate |
 | `scripts/part_audit.py` | Part-fit gate: floating parts, wall pokes, overlaps (mm at model scale) |
 | `scripts/slice_check.py` | Layer closedness gate (every slice must close) |
 | `scripts/render_stl.py` | Color-coded check renders of the STL |

@@ -640,6 +640,49 @@ check("rails fused into the hull profile (hull reaches outwale width)",
       abs(_hull_pts[:, 1].max() * 24 - (_fl_beam * 1000 / 2
                                         + designer.GUNW_T * 1000)) < 6.0)
 
+# --- materials list: quantities computed from the model ------------------
+r_m = run(['python3', f'{B}/materials.py', '/tmp/h_fl.json',
+           '--people', '3', '--gear', '670', '--json', '/tmp/bom.json',
+           '-o', '/tmp/bom.md'])
+_bom = json.load(open('/tmp/bom.json')) if r_m.returncode == 0 else {}
+_md = open('/tmp/bom.md').read() if r_m.returncode == 0 else ''
+check("materials: builds, ships a sane sheet count from the model area",
+      r_m.returncode == 0 and _bom.get("n_sheets", 0) >= 2
+      and _bom.get("ply_a", 0) > 0)
+check("materials: flotation + capacity plate rows present (census items)",
+      "Flotation" in _md and "Capacity plate" in _md and "183.53" in _md)
+# the sheet count is area-derived, not a constant: a bigger hull needs more
+r_m2 = run(['python3', f'{B}/param_hull.py', '--loa', '6', '--beam', '2.0',
+            '--depth', '0.7', '--rocker', '0.2', '-o', '/tmp/h_big.json'])
+r_m3 = run(['python3', f'{B}/materials.py', '/tmp/h_big.json',
+            '--people', '4', '--json', '/tmp/bom2.json', '-o', '/tmp/bom2.md'])
+_bom2 = json.load(open('/tmp/bom2.json')) if r_m3.returncode == 0 else {}
+check("materials: a 6 m hull needs more ply than a 4 m one",
+      r_m3.returncode == 0
+      and _bom2.get("n_sheets", 0) > _bom.get("n_sheets", 0))
+check("capacity: USCG max hp rises with the size factor",
+      designer.max_hp(4.0, 0.7) < designer.max_hp(6.0, 1.0)
+      and designer.max_hp(3.0, 1.0, flat_bottom=True)
+      < designer.max_hp(3.0, 1.0))
+
+# --- construction plan: molds fan + table + midship + setup --------------
+r_c = run(['python3', f'{B}/construction.py', '/tmp/h_fl.json', '-o',
+           '/tmp/constr.spec.json'])
+_cs = json.load(open('/tmp/constr.spec.json')) if r_c.returncode == 0 else {}
+_cnames = [v["name"] for v in _cs.get("views", [])]
+_n_st = len(hull.load_hull('/tmp/h_fl.json')["stations"])
+check("construction: spec builds molds + table + midship + setup",
+      r_c.returncode == 0
+      and {"STATION MOLDS", "MOLD TABLE", "MIDSHIP CONSTRUCTION",
+           "SETUP"} <= set(_cnames))
+check("construction: the mold table lists every station",
+      r_c.returncode == 0
+      and len(_cs["views"][1]["texts"]) >= _n_st + 2)
+r_c2 = run(['python3', f'{D}/draft.py', '/tmp/constr.spec.json', '--out',
+            '/tmp/constr', '--png'], timeout=120)
+check("construction: the sheet renders without draft errors",
+      r_c2.returncode == 0)
+
 print()
 print(f"{len(fails)} failures" if fails else "ALL PASS")
 sys.exit(1 if fails else 0)
